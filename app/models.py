@@ -9,7 +9,15 @@ dans un schéma qui existe déjà.
 
 import uuid
 
-from sqlalchemy import ARRAY, TIMESTAMP, Double, ForeignKey, Integer, String
+from sqlalchemy import (
+    ARRAY,
+    TIMESTAMP,
+    Double,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +37,12 @@ class Site(Base):
 
 class MeasureRaw(Base):
     __tablename__ = "measure_raw"
+    # Clé métier de la mesure, sur laquelle le consumer s'appuie pour une insertion
+    # idempotente. Déclarée ici pour que le schéma créé en test reste fidèle à celui
+    # du script d'init, seul propriétaire des tables en production.
+    __table_args__ = (
+        UniqueConstraint("site_id", "timestamp", name="uq_measure_raw_site_timestamp"),
+    )
 
     measure_raw_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -50,10 +64,18 @@ class MeasureRaw(Base):
 
 class Alert(Base):
     __tablename__ = "alert"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_alert_id", "timestamp", name="uq_alert_source_alert_id"
+        ),
+    )
 
     alert_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # Identifiant attribué par l'API source (ex. ALR-SITE002-1718458320). Plus parlant
+    # qu'un UUID pour qui lit une alerte, et clé d'idempotence côté ingestion.
+    source_alert_id: Mapped[str] = mapped_column(String, nullable=False)
     timestamp: Mapped[object] = mapped_column(
         "timestamp", TIMESTAMP(timezone=True), primary_key=True
     )

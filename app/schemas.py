@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -33,7 +34,10 @@ class ReadingOut(BaseModel):
 class AlertOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    alert_id: str
+    # Typé en UUID et non en str : pydantic ne convertit pas l'un en l'autre et
+    # refusait la réponse. FastAPI le rend en chaîne dans le JSON.
+    alert_id: uuid.UUID
+    source_alert_id: str
     timestamp: datetime
     site_id: str
     severity: str | None = None
