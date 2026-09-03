@@ -1,18 +1,55 @@
-name: Build, push and deploy API
+name: Test, build, push and deploy API
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_USER: g4_app
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: g4_db_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U g4_app -d g4_db_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.7"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://g4_app:test_password@localhost:5432/g4_db_test
+          DATABASE_URL: postgresql+psycopg://g4_app:test_password@localhost:5432/g4_db_test
+          JWT_SECRET_KEY: ci_test_secret
+          API_USERNAME: admin
+          API_PASSWORD_HASH: "unused_in_tests"
+        run: pytest -v
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}
+      stage: ${{ steps.meta.outputs.stage }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,9 +60,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set image tag
+      - name: Set image tag and stage
         id: meta
-        run: echo "image=ghcr.io/enervision-g4/enervision-api:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "image=ghcr.io/enervision-g4/enervision-api:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "stage=prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=dev" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -39,6 +82,6 @@ jobs:
     uses: enervision-g4/enervision-devops/.github/workflows/deploy.yml@main
     with:
       service: api
-      environment: onprem
+      stage: ${{ needs.build-and-push.outputs.stage }}
       image: ${{ needs.build-and-push.outputs.image }}
     secrets: inherit
