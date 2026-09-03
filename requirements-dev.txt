@@ -1,0 +1,5 @@
+# Dépendances de test uniquement (pas dans l'image Docker de prod).
+-r requirements.txt
+
+pytest==8.3.3
+httpx==0.27.2
