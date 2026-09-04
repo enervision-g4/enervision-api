@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 
 from app.models import Alert, Site
@@ -18,9 +19,11 @@ def make_site(db_session, site_id="SITE001"):
 
 
 def make_alert(db_session, site_id, severity="critical", **overrides):
+    raised_at = overrides.pop("timestamp", datetime.now(timezone.utc))
     defaults = dict(
+        source_alert_id=f"ALR-{site_id}-{raised_at.timestamp():.6f}",
         site_id=site_id,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=raised_at,
         severity=severity,
         type="outage",
         message="Risque de surcharge",
@@ -66,3 +69,18 @@ def test_list_alerts_filters_by_site(client, db_session, auth_headers):
     body = response.json()
     assert len(body) == 1
     assert body[0]["site_id"] == "SITE002"
+
+
+def test_list_alerts_exposes_both_identifiers(client, db_session, auth_headers):
+    make_site(db_session)
+    make_alert(db_session, "SITE001")
+
+    response = client.get("/api/v1/alerts", headers=auth_headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    # alert_id est l'identifiant technique, source_alert_id celui de l'API source.
+    # Les deux doivent traverser la sérialisation : un UUID typé en str la faisait
+    # échouer et rendait la route inutilisable dès qu'une alerte existait.
+    uuid.UUID(body[0]["alert_id"])
+    assert body[0]["source_alert_id"].startswith("ALR-SITE001-")
