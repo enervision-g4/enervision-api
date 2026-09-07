@@ -47,6 +47,17 @@ class AlertOut(BaseModel):
     threshold_kw: float | None = None
 
 
+class AlertPage(BaseModel):
+    """Enveloppe paginée pour GET /api/v1/alerts — le dashboard a besoin du
+    total (pour calculer le nombre de pages) en plus des alertes de la page
+    courante, une simple liste ne suffit plus une fois paginé/trié."""
+
+    items: list[AlertOut]
+    total: int
+    page: int
+    limit: int
+
+
 class PredictionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
