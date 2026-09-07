@@ -28,7 +28,8 @@ Toutes les routes `/api/v1/*` exigent un token JWT (`Authorization: Bearer
 | `GET /api/v1/sites` | Liste des sites |
 | `GET /api/v1/sites/{site_id}` | Détail d'un site |
 | `GET /api/v1/readings` | Historique des mesures (`site_id`, `start_time`, `end_time`, `limit`) |
-| `GET /api/v1/alerts` | Alertes (`site_id`, `severity`) |
+| `GET /api/v1/alerts` | Alertes paginées (`page`, `limit`), triables (`sort_by`: `timestamp`/`severity`/`site_id`, `order`: `asc`/`desc`), filtrables (`site_id`, `severity`, `start_time`, `end_time`) — réponse `{items, total, page, limit}` |
+| `GET /api/v1/alerts/summary` | Nombre d'alertes par sévérité (`site_id`, `start_time`, `end_time`) |
 | `GET /api/v1/predictions` | Prédictions de consommation (`site_id`, `model_version`, `limit`), triées par horizon (`target_timestamp`) croissant |
 | `GET /api/v1/recommendations` | Recommandations d'actions correctives (`site_id`, `status`, `limit`), les plus récentes d'abord |
 
