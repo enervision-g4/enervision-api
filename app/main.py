@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import alerts, auth, predictions, readings, recommendations, sites
+from app.routers import alerts, auth, live, predictions, readings, recommendations, sites
 
 app = FastAPI(
     title="EnerVision API",
@@ -37,6 +37,7 @@ app.include_router(readings.router)
 app.include_router(alerts.router)
 app.include_router(predictions.router)
 app.include_router(recommendations.router)
+app.include_router(live.router)
 
 
 @app.get("/health", tags=["health"])

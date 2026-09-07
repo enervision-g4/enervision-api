@@ -33,6 +33,18 @@ Toutes les routes `/api/v1/*` exigent un token JWT (`Authorization: Bearer
 | `GET /api/v1/predictions` | Prédictions de consommation (`site_id`, `model_version`, `limit`), triées par horizon (`target_timestamp`) croissant |
 | `GET /api/v1/recommendations` | Recommandations d'actions correctives (`site_id`, `status`, `limit`), les plus récentes d'abord |
 
+## Temps réel (WebSocket)
+
+`GET /ws/readings?site_id=...&token=...` et `GET /ws/alerts?token=...&site_id=...` (site_id optionnel)
+poussent respectivement chaque nouvelle mesure/alerte dès qu'elle apparaît en base (poll interne toutes
+les 5s, ne pousse que les lignes nouvelles). Le token JWT est passé en query string — un WebSocket natif
+ne peut pas poser de header `Authorization` depuis un navigateur — jamais dans l'URL en clair côté logs
+serveur puisqu'il expire vite (`JWT_EXPIRE_MINUTES`), mais à garder en tête si des access logs bruts sont
+un jour activés. Ce n'est pas un vrai push événementiel (l'ETL/les consumers Kafka écrivent en base sans
+notifier l'API) : c'est un polling côté serveur toutes les 5s, mais le client ne voit que des messages
+utiles (aucun trafic quand rien de neuf), contrairement au polling HTTP précédent qui redemandait tout
+à chaque fois.
+
 ## Structure
 
 ```
@@ -50,7 +62,8 @@ app/
     ├── readings.py         # GET /api/v1/readings
     ├── alerts.py           # GET /api/v1/alerts
     ├── predictions.py      # GET /api/v1/predictions
-    └── recommendations.py  # GET /api/v1/recommendations
+    ├── recommendations.py  # GET /api/v1/recommendations
+    └── live.py             # GET /ws/readings, GET /ws/alerts (WebSocket)
 ```
 
 ## Secrets
