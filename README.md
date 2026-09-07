@@ -63,6 +63,12 @@ GitHub `ENV_FILE_CONTENTS` de l'environnement ciblé (`onprem-dev` /
 `API_PASSWORD_HASH` est un hash Argon2id, jamais le mot de passe en clair
 (générateur : `python -c "from app.security import hash_password; print(hash_password('...'))"`).
 
+`CORS_ALLOWED_ORIGINS` (une ou plusieurs origines séparées par des virgules)
+doit être l'URL exacte (protocole+hôte+port) depuis laquelle le dashboard est
+servi, sinon le navigateur bloque tous ses appels à l'API (CORS). En
+déploiement, doit correspondre à `API_URL`/`DASHBOARD_PORT` du même
+environnement — voir `enervision-devops/envs/onprem.env.example`.
+
 ## Déploiement
 
 Le workflow `.github/workflows/ci-cd.yml` build l'image, la pousse sur
