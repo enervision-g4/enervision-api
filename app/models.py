@@ -85,3 +85,39 @@ class Alert(Base):
     message: Mapped[str | None] = mapped_column(String)
     value_kw: Mapped[float | None] = mapped_column(Double)
     threshold_kw: Mapped[float | None] = mapped_column(Double)
+
+
+class Prediction(Base):
+    __tablename__ = "prediction"
+
+    prediction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    site_id: Mapped[str] = mapped_column(String, ForeignKey("site.site_id"), nullable=False)
+    target_timestamp: Mapped[object | None] = mapped_column(TIMESTAMP(timezone=True))
+    predicted_consumption_kw: Mapped[float | None] = mapped_column(Double)
+    threshold_kw: Mapped[float | None] = mapped_column(Double)
+    model_version: Mapped[str | None] = mapped_column(String)
+    # Horodatage de génération de la prédiction (colonne de partitionnement de
+    # l'hypertable), distinct de target_timestamp qui est l'horizon prédit.
+    timestamp: Mapped[object] = mapped_column(
+        "timestamp", TIMESTAMP(timezone=True), primary_key=True
+    )
+
+
+class Recommendation(Base):
+    __tablename__ = "recommendation"
+
+    recommendation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    site_id: Mapped[str] = mapped_column(String, ForeignKey("site.site_id"), nullable=False)
+    # Pas de ForeignKey : une hypertable ne peut pas porter la contrainte UNIQUE sur
+    # (prediction_id) seul qu'exigerait une FK vers "prediction" (voir le commentaire
+    # en tête de 002_create_tables.sql). Lien simplement indexé côté devops.
+    prediction_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    timestamp: Mapped[object] = mapped_column(
+        "timestamp", TIMESTAMP(timezone=True), primary_key=True
+    )
+    action_description: Mapped[str | None] = mapped_column(String)
+    status: Mapped[str | None] = mapped_column(String)

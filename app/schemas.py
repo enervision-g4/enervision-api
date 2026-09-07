@@ -47,6 +47,31 @@ class AlertOut(BaseModel):
     threshold_kw: float | None = None
 
 
+class PredictionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    prediction_id: uuid.UUID
+    site_id: str
+    target_timestamp: datetime | None = None
+    predicted_consumption_kw: float | None = None
+    threshold_kw: float | None = None
+    model_version: str | None = None
+    # Horodatage de génération de la prédiction, distinct de target_timestamp
+    # (l'horizon prédit).
+    timestamp: datetime
+
+
+class RecommendationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    recommendation_id: uuid.UUID
+    site_id: str
+    prediction_id: uuid.UUID | None = None
+    timestamp: datetime
+    action_description: str | None = None
+    status: str | None = None
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
