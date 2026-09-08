@@ -20,4 +20,3 @@ jobs:
       working-directory: .
       run-tests: true
       dockerfile: Dockerfile
-      
