@@ -35,15 +35,31 @@ Toutes les routes `/api/v1/*` exigent un token JWT (`Authorization: Bearer
 
 ## Temps réel (WebSocket)
 
-`GET /ws/readings?site_id=...&token=...` et `GET /ws/alerts?token=...&site_id=...` (site_id optionnel)
-poussent respectivement chaque nouvelle mesure/alerte dès qu'elle apparaît en base (poll interne toutes
-les 5s, ne pousse que les lignes nouvelles). Le token JWT est passé en query string — un WebSocket natif
-ne peut pas poser de header `Authorization` depuis un navigateur — jamais dans l'URL en clair côté logs
-serveur puisqu'il expire vite (`JWT_EXPIRE_MINUTES`), mais à garder en tête si des access logs bruts sont
-un jour activés. Ce n'est pas un vrai push événementiel (l'ETL/les consumers Kafka écrivent en base sans
-notifier l'API) : c'est un polling côté serveur toutes les 5s, mais le client ne voit que des messages
-utiles (aucun trafic quand rien de neuf), contrairement au polling HTTP précédent qui redemandait tout
-à chaque fois.
+`GET /ws/readings?site_id=...&token=...[&since=...]` et
+`GET /ws/alerts?token=...[&site_id=...][&since=...]` poussent respectivement chaque nouvelle
+mesure/alerte dès qu'elle apparaît en base (poll interne toutes les 5s, ne pousse que les lignes
+nouvelles). Le token JWT est passé en query string — un WebSocket natif ne peut pas poser de header
+`Authorization` depuis un navigateur — jamais dans l'URL en clair côté logs serveur puisqu'il expire vite
+(`JWT_EXPIRE_MINUTES`), mais à garder en tête si des access logs bruts sont un jour activés. Ce n'est pas
+un vrai push événementiel (l'ETL/les consumers Kafka écrivent en base sans notifier l'API) : c'est un
+polling côté serveur toutes les 5s, mais le client ne voit que des messages utiles (aucun trafic quand
+rien de neuf), contrairement au polling HTTP précédent qui redemandait tout à chaque fois.
+
+Points de contrat à connaître côté client :
+
+- **`since`** (ISO 8601, optionnel) : horodatage de la donnée la plus récente que le client a déjà
+  chargée en REST. Le flux reprend strictement après cette date — ni trou, ni rejeu. **Sans `since`, le
+  flux démarre au dernier horodatage présent en base : l'historique n'est jamais rejoué.** À encoder
+  (le `+00:00` d'un fuseau devient une espace s'il n'est pas échappé) ; `URLSearchParams` le fait.
+- **`{"type": "heartbeat"}`** : trame envoyée toutes les ~25s de silence pour que les reverse-proxy ne
+  coupent pas une connexion inactive. À ignorer côté client.
+- **Fin de connexion** : le serveur attend en parallèle un message du client, ce qui lui fait détecter
+  immédiatement une déconnexion. Sans cette attente, un client parti n'était repéré qu'au premier envoi
+  en échec — donc jamais tant qu'aucune donnée neuve n'arrivait, et chaque navigation dans le dashboard
+  laissait derrière elle une boucle qui continuait d'interroger la base (cause du conteneur d'API à
+  +50% de CPU). Couvert par `tests/test_live.py::test_ws_stops_polling_when_client_disconnects`.
+- **Plafond** : 200 connexions simultanées (`MAX_CONCURRENT_CONNECTIONS`), au-delà la connexion est
+  refusée avec le code 1013 ("try again later").
 
 ## Structure
 
