@@ -30,6 +30,10 @@ def list_readings(
     )
     if site_id:
         stmt = stmt.where(MeasureRaw.site_id == site_id)
-    stmt = stmt.order_by(MeasureRaw.timestamp.asc()).limit(limit)
+    # Tri décroissant + limite, puis remise en ordre chronologique : quand la
+    # fenêtre contient plus de `limit` mesures (typiquement 7 jours), on garde
+    # les plus RÉCENTES. Trier en croissant renvoyait les plus anciennes et le
+    # graphique s'arrêtait net au début de la période demandée.
+    stmt = stmt.order_by(MeasureRaw.timestamp.desc()).limit(limit)
 
-    return db.scalars(stmt).all()
+    return list(reversed(db.scalars(stmt).all()))
