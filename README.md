@@ -28,7 +28,7 @@ Documentation interactive : http://localhost:3000/docs
 ## Développement
 
 ```bash
-uv run pytest              # suite de tests (TEST_DATABASE_URL vers un Postgres de test)
+uv run pytest              # suite de tests unitaires (SQLite en mémoire, aucune base externe)
 uv run ruff check app tests
 uv run mypy
 ```
