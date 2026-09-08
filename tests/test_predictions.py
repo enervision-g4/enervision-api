@@ -90,6 +90,56 @@ def test_list_predictions_ordered_by_target_timestamp_asc(client, db_session, au
     assert body[0]["target_timestamp"] < body[1]["target_timestamp"]
 
 
+def test_list_predictions_keeps_only_the_latest_run_per_target_hour(
+    client, db_session, auth_headers
+):
+    """Le service ml rejoue un lot a intervalle regulier et reecrit une
+    prediction pour le meme creneau a chaque fois (l'historique des runs
+    sert a mesurer sa justesse). Par defaut, une seule ligne par
+    (site_id, target_timestamp) doit remonter : la plus recente."""
+    make_site(db_session)
+    now = datetime.now(timezone.utc)
+    same_target_hour = now + timedelta(hours=1)
+    make_prediction(
+        db_session,
+        "SITE001",
+        same_target_hour,
+        timestamp=now - timedelta(hours=1),
+        predicted_consumption_kw=500.0,
+    )
+    make_prediction(
+        db_session,
+        "SITE001",
+        same_target_hour,
+        timestamp=now,
+        predicted_consumption_kw=650.0,
+    )
+
+    response = client.get(
+        "/api/v1/predictions", params={"site_id": "SITE001"}, headers=auth_headers
+    )
+
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["predicted_consumption_kw"] == 650.0
+
+
+def test_list_predictions_can_include_every_run_when_asked(client, db_session, auth_headers):
+    make_site(db_session)
+    now = datetime.now(timezone.utc)
+    same_target_hour = now + timedelta(hours=1)
+    make_prediction(db_session, "SITE001", same_target_hour, timestamp=now - timedelta(hours=1))
+    make_prediction(db_session, "SITE001", same_target_hour, timestamp=now)
+
+    response = client.get(
+        "/api/v1/predictions",
+        params={"site_id": "SITE001", "latest_only": False},
+        headers=auth_headers,
+    )
+
+    assert len(response.json()) == 2
+
+
 def test_predictions_route_requires_auth(client):
     response = client.get("/api/v1/predictions")
 
