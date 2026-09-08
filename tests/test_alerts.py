@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.models import Alert, Site
 
@@ -19,7 +19,7 @@ def make_site(db_session, site_id="SITE001"):
 
 
 def make_alert(db_session, site_id, severity="critical", **overrides):
-    raised_at = overrides.pop("timestamp", datetime.now(timezone.utc))
+    raised_at = overrides.pop("timestamp", datetime.now(UTC))
     defaults = dict(
         source_alert_id=f"ALR-{site_id}-{raised_at.timestamp():.6f}",
         site_id=site_id,
@@ -75,7 +75,7 @@ def test_list_alerts_filters_by_site(client, db_session, auth_headers):
 
 def test_list_alerts_filters_by_time_range(client, db_session, auth_headers):
     make_site(db_session)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     make_alert(db_session, "SITE001", timestamp=now - timedelta(days=5))
     make_alert(db_session, "SITE001", timestamp=now)
 
@@ -107,12 +107,14 @@ def test_list_alerts_exposes_both_identifiers(client, db_session, auth_headers):
 
 def test_list_alerts_pagination(client, db_session, auth_headers):
     make_site(db_session)
-    base = datetime.now(timezone.utc)
+    base = datetime.now(UTC)
     for i in range(5):
         make_alert(db_session, "SITE001", timestamp=base - timedelta(minutes=i))
 
-    page1 = client.get("/api/v1/alerts", params={"limit": 2, "page": 1}, headers=auth_headers).json()
-    page2 = client.get("/api/v1/alerts", params={"limit": 2, "page": 2}, headers=auth_headers).json()
+    params1 = {"limit": 2, "page": 1}
+    params2 = {"limit": 2, "page": 2}
+    page1 = client.get("/api/v1/alerts", params=params1, headers=auth_headers).json()
+    page2 = client.get("/api/v1/alerts", params=params2, headers=auth_headers).json()
 
     assert page1["total"] == 5
     assert len(page1["items"]) == 2
@@ -138,7 +140,9 @@ def test_list_alerts_sort_by_severity_asc(client, db_session, auth_headers):
 
 
 def test_list_alerts_rejects_invalid_sort_by(client, auth_headers):
-    response = client.get("/api/v1/alerts", params={"sort_by": "not_a_column"}, headers=auth_headers)
+    response = client.get(
+        "/api/v1/alerts", params={"sort_by": "not_a_column"}, headers=auth_headers
+    )
 
     assert response.status_code == 422
 
@@ -167,7 +171,9 @@ def test_alerts_summary_filters_by_site(client, db_session, auth_headers):
     make_alert(db_session, "SITE001", severity="critical")
     make_alert(db_session, "SITE002", severity="low")
 
-    response = client.get("/api/v1/alerts/summary", params={"site_id": "SITE001"}, headers=auth_headers)
+    response = client.get(
+        "/api/v1/alerts/summary", params={"site_id": "SITE001"}, headers=auth_headers
+    )
 
     assert response.status_code == 200
     assert response.json() == {"critical": 1}
