@@ -7,14 +7,31 @@ mesures, alertes, prédictions et recommandations. Authentification par JWT
 
 ## Lancer en local
 
+Dépendances gérées par [uv](https://docs.astral.sh/uv/) (même outillage que
+`enervision-etl`) : pas de `venv`/`pip` manuels, `uv.lock` fige les versions
+exactes.
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+
+uv sync
 cp .env.example .env   # renseigner DATABASE_URL vers une instance TimescaleDB
-uvicorn app.main:app --reload --port 3000
+uv run uvicorn app.main:app --reload --port 3000
 ```
 
+`uv sync` télécharge Python 3.14 si la machine ne l'a pas, crée `.venv/` et
+installe les versions exactes figées dans `uv.lock`.
+
 Documentation interactive : http://localhost:3000/docs
+
+## Développement
+
+```bash
+uv run pytest              # suite de tests (TEST_DATABASE_URL vers un Postgres de test)
+uv run ruff check app tests
+uv run mypy
+```
 
 ## Routes
 

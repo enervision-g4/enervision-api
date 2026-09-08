@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
 import pytest
@@ -35,7 +35,7 @@ def make_site(db_session, site_id="SITE001"):
 def make_reading(db_session, site_id, **overrides):
     defaults = dict(
         site_id=site_id,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         consumption_kw=42.0,
     )
     defaults.update(overrides)
@@ -49,7 +49,7 @@ def make_alert(db_session, site_id, **overrides):
     defaults = dict(
         source_alert_id="ALR-TEST-1",
         site_id=site_id,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         severity="critical",
         type="overconsumption",
         message="Seuil dépassé",
@@ -89,7 +89,7 @@ def test_ws_readings_pushes_rows_newer_than_since(client, db_session):
     """`since` = horodatage de la dernière mesure déjà chargée en REST par le
     dashboard : le flux reprend exactement là, sans trou ni rejeu."""
     make_site(db_session)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     make_reading(db_session, "SITE001", timestamp=now - timedelta(minutes=10), consumption_kw=10.0)
     make_reading(db_session, "SITE001", timestamp=now, consumption_kw=99.0)
     token = create_access_token(subject="test-user")
@@ -122,8 +122,10 @@ def test_ws_readings_without_since_does_not_replay_history(client, db_session):
 
 def test_ws_alerts_pushes_rows_newer_than_since(client, db_session):
     make_site(db_session)
-    now = datetime.now(timezone.utc)
-    make_alert(db_session, "SITE001", timestamp=now - timedelta(minutes=10), source_alert_id="ALR-1")
+    now = datetime.now(UTC)
+    make_alert(
+        db_session, "SITE001", timestamp=now - timedelta(minutes=10), source_alert_id="ALR-1"
+    )
     make_alert(db_session, "SITE001", timestamp=now, source_alert_id="ALR-2", message="Nouvelle")
     token = create_access_token(subject="test-user")
     # quote() indispensable : le "+00:00" du fuseau est sinon décodé comme

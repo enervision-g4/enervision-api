@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Alert
-from app.schemas import AlertPage
+from app.schemas import AlertOut, AlertPage
 from app.security import get_current_subject
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
@@ -84,7 +84,9 @@ def list_alerts(
     pages, ce qu'une liste brute ne permet pas de déduire.
     """
     total = db.scalar(
-        _apply_filters(select(func.count()).select_from(Alert), site_id, severity, start_time, end_time)
+        _apply_filters(
+            select(func.count()).select_from(Alert), site_id, severity, start_time, end_time
+        )
     )
 
     column = SORTABLE_COLUMNS[sort_by]
@@ -93,4 +95,13 @@ def list_alerts(
     stmt = stmt.order_by(ordered_column).offset((page - 1) * limit).limit(limit)
 
     items = db.scalars(stmt).all()
-    return AlertPage(items=items, total=total or 0, page=page, limit=limit)
+    # Conversion explicite (plutôt que de laisser AlertPage(items=items) le
+    # faire implicitement) : mypy ne sait pas que `from_attributes=True` rend
+    # cette validation valide, un objet ORM Alert n'étant pas un AlertOut à
+    # ses yeux.
+    return AlertPage(
+        items=[AlertOut.model_validate(item) for item in items],
+        total=total or 0,
+        page=page,
+        limit=limit,
+    )

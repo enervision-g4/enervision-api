@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
@@ -34,7 +34,7 @@ def verify_credentials(username: str, password: str) -> bool:
 
 
 def create_access_token(subject: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.jwt_expire_minutes)
     payload = {"sub": subject, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
@@ -52,4 +52,6 @@ def get_current_subject(token: str = Depends(oauth2_scheme)) -> str:
             raise credentials_exception
         return subject
     except JWTError:
-        raise credentials_exception
+        # `from None` : la cause exacte (signature invalide, expiration...) ne
+        # regarde pas l'appelant, seul le 401 générique fait foi.
+        raise credentials_exception from None
