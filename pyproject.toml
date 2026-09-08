@@ -53,7 +53,11 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path"]
 # B011 (assert False) : pattern deliberement utilise pour verifier un refus de
 # connexion WebSocket, pas une portee de securite. N806 : SessionLocal suit la
 # convention SQLAlchemy usuelle, pas la casse de variable locale attendue.
-"tests/*" = ["ANN", "B011", "N806"]
+# E402 (conftest.py uniquement en pratique) : les valeurs par defaut requises
+# par app.config.Settings doivent etre injectees dans os.environ AVANT que les
+# `from app...` n'importent (et ne construisent) ce singleton, ce qui impose
+# du code entre les imports.
+"tests/*" = ["ANN", "B011", "N806", "E402"]
 
 [tool.mypy]
 files = ["app"]
