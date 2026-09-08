@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, aliased
 
 from app.database import get_db
 from app.models import Prediction
@@ -40,13 +40,22 @@ def list_predictions(
         stmt = stmt.where(Prediction.model_version == model_version)
 
     if latest_only:
-        # DISTINCT ON garde la première ligne de chaque groupe (site_id,
-        # target_timestamp) : trier ce groupe par timestamp décroissant fait
-        # que cette première ligne est la plus récente.
-        stmt = stmt.distinct(Prediction.site_id, Prediction.target_timestamp).order_by(
-            Prediction.site_id,
-            Prediction.target_timestamp.asc(),
-            Prediction.timestamp.desc(),
+        # `DISTINCT ON` n'existe que sur Postgres (silencieusement ignoré
+        # ailleurs, cf. SADeprecationWarning) : row_number() + partition_by
+        # fait la même chose (garder la ligne la plus récente par groupe
+        # site_id/target_timestamp) en restant portable — SQLite (tests
+        # unitaires) y compris. Même motif que le sous-échantillonnage de
+        # GET /api/v1/readings (app/routers/readings.py).
+        row_number = func.row_number().over(
+            partition_by=(Prediction.site_id, Prediction.target_timestamp),
+            order_by=Prediction.timestamp.desc(),
+        )
+        numbered = stmt.add_columns(row_number.label("rn")).subquery()
+        latest = aliased(Prediction, numbered)
+        stmt = (
+            select(latest)
+            .where(numbered.c.rn == 1)
+            .order_by(numbered.c.target_timestamp.asc())
         )
     else:
         stmt = stmt.order_by(Prediction.target_timestamp.asc())
