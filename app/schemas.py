@@ -83,6 +83,17 @@ class RecommendationOut(BaseModel):
     status: str | None = None
 
 
+class RecommendationPage(BaseModel):
+    """Enveloppe paginée pour GET /api/v1/recommendations — même forme que
+    AlertPage, pour réutiliser le composant Pagination générique du
+    dashboard sans lui faire connaître deux formats de réponse différents."""
+
+    items: list[RecommendationOut]
+    total: int
+    page: int
+    limit: int
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
