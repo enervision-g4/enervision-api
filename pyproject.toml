@@ -1,0 +1,71 @@
+[project]
+name = "enervision-api"
+version = "0.1.0"
+description = "API EnerVision : authentification, lecture des mesures/alertes/predictions/recommandations, flux WebSocket temps reel"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.4",
+    "sqlalchemy>=2.0.52",
+    # Variante binaire : embarque libpq, l'image finale reste sans chaine de
+    # compilation (meme choix que enervision-etl/enervision-consumer).
+    "psycopg[binary]>=3.3.5",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "python-jose[cryptography]>=3.5.0",
+    "argon2-cffi>=25.1.0",
+    "python-multipart>=0.0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    # Fournit les options --cov/--cov-report utilisees par le job de test du
+    # workflow reutilisable enervision-devops (meme choix qu'enervision-etl).
+    "pytest-cov>=6.0",
+    "httpx>=0.27.2",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[tool.uv]
+# Service applicatif (lance via uvicorn), pas une librairie publiee : pas de
+# wheel a construire, seul un environnement verrouille par uv.lock suffit.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "RUF"]
+# Meme choix qu'enervision-etl : Optional[X] plutot que X | None.
+ignore = ["UP007", "UP045"]
+
+[tool.ruff.lint.flake8-bugbear]
+# `Depends(...)`/`Query(...)` en valeur par defaut est l'idiome FastAPI standard
+# (l'injection de dependances repose dessus) : sans ceci, B008 le signale a tort
+# sur toutes les routes.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path"]
+
+[tool.ruff.lint.per-file-ignores]
+# B011 (assert False) : pattern deliberement utilise pour verifier un refus de
+# connexion WebSocket, pas une portee de securite. N806 : SessionLocal suit la
+# convention SQLAlchemy usuelle, pas la casse de variable locale attendue.
+# E402 (conftest.py uniquement en pratique) : les valeurs par defaut requises
+# par app.config.Settings doivent etre injectees dans os.environ AVANT que les
+# `from app...` n'importent (et ne construisent) ce singleton, ce qui impose
+# du code entre les imports.
+"tests/*" = ["ANN", "B011", "N806", "E402"]
+
+[tool.mypy]
+files = ["app"]
+ignore_missing_imports = true
+# Sans ce plugin, mypy ignore que les champs de BaseSettings sont peuplés
+# depuis l'environnement (.env) : il exige à tort tous les arguments du
+# constructeur de `Settings` à l'appel `Settings()`.
+plugins = ["pydantic.mypy"]
