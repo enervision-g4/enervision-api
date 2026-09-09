@@ -79,6 +79,64 @@ def test_list_readings_respects_limit(client, db_session, auth_headers):
     assert len(response.json()) == 2
 
 
+def test_range_hours_anchors_on_latest_data_not_wall_clock(client, db_session, auth_headers):
+    """Régression : `range_hours` doit ancrer la fenêtre sur la donnée la plus
+    récente réellement en base, pas sur l'horloge du serveur. Sans cet
+    ancrage, un pipeline d'ingestion en retard (l'ETL écrit des données
+    "vieilles" de quelques minutes/heures par rapport à l'horloge murale)
+    rendait les fenêtres courtes (1h, 6h) systématiquement vides : la période
+    [maintenant-1h, maintenant] ne recoupait alors aucune donnée réelle, même
+    le jour où une fenêtre de 24h en montrait pourtant."""
+    make_site(db_session)
+    # Horodatage arbitrairement éloigné de "maintenant" (simule un fort
+    # retard d'ingestion) : si la fenêtre était calculée depuis l'horloge du
+    # serveur, cette donnée resterait invisible quelle que soit `range_hours`.
+    lagged_timestamp = datetime.now(timezone.utc) - timedelta(hours=5)
+    make_reading(db_session, "SITE001", lagged_timestamp, consumption_kw=42.0)
+
+    response = client.get(
+        "/api/v1/readings",
+        params={"site_id": "SITE001", "range_hours": 1},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["consumption_kw"] == 42.0
+
+
+def test_readings_over_limit_are_sampled_across_full_window(client, db_session, auth_headers):
+    """Régression : au-delà de `limit`, ne pas se contenter de garder les
+    lignes les plus RÉCENTES. Avec un rythme d'ingestion élevé, cela ne
+    montrait en réalité qu'une tranche de quelques heures et faisait
+    disparaître tout le reste de la période demandée (ex. "7 jours" ne
+    montrait que la dernière heure) — donnant l'impression à tort qu'il n'y
+    avait aucune donnée les jours précédents. L'échantillonnage doit rester
+    réparti sur toute la fenêtre, du point le plus ancien au plus récent."""
+    make_site(db_session)
+    now = datetime.now(timezone.utc)
+    for i in range(20):
+        make_reading(db_session, "SITE001", now - timedelta(days=7) + timedelta(hours=i * 8))
+
+    response = client.get(
+        "/api/v1/readings",
+        params={"site_id": "SITE001", "range_hours": 24 * 7, "limit": 5},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 5
+    timestamps = [datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00")) for r in body]
+    assert timestamps == sorted(timestamps)  # ordre chronologique préservé
+    # Le point le plus ancien de la fenêtre doit être représenté (à la minute
+    # près) : preuve que l'échantillonnage couvre toute la période, pas
+    # seulement la fin.
+    earliest_inserted = now - timedelta(days=7)
+    assert abs((timestamps[0] - earliest_inserted).total_seconds()) < 60
+
+
 def test_list_readings_keeps_null_values(client, db_session, auth_headers):
     """Conseil du sujet (API Mock doc) : ne jamais filtrer les NULL, les
     stocker/retourner tels quels avec data_quality."""

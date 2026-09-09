@@ -47,6 +47,17 @@ class AlertOut(BaseModel):
     threshold_kw: float | None = None
 
 
+class AlertPage(BaseModel):
+    """Enveloppe paginée pour GET /api/v1/alerts — le dashboard a besoin du
+    total (pour calculer le nombre de pages) en plus des alertes de la page
+    courante, une simple liste ne suffit plus une fois paginé/trié."""
+
+    items: list[AlertOut]
+    total: int
+    page: int
+    limit: int
+
+
 class PredictionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,6 +81,17 @@ class RecommendationOut(BaseModel):
     timestamp: datetime
     action_description: str | None = None
     status: str | None = None
+
+
+class RecommendationPage(BaseModel):
+    """Enveloppe paginée pour GET /api/v1/recommendations — même forme que
+    AlertPage, pour réutiliser le composant Pagination générique du
+    dashboard sans lui faire connaître deux formats de réponse différents."""
+
+    items: list[RecommendationOut]
+    total: int
+    page: int
+    limit: int
 
 
 class Token(BaseModel):
